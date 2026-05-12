@@ -2,7 +2,6 @@
   <div class="game-container">
     <div class="score-board">Score: {{ score }}</div>
     
-    <!-- Player and Obstacle -->
     <div class="player" :style="{ bottom: playerY + 'px' }"></div>
     <div class="obstacle" :style="{ left: obstaclePosition.x + 'px' }"></div>
 
