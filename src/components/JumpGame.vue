@@ -1,6 +1,7 @@
 <template>
   <div class="game-container">
-    <div class="score-board">Score: {{ score }}</div>
+    <!-- CHANGE 1: Use currentScore from Vuex -->
+    <div class="score-board">Score: {{ currentScore }}</div>
     
     <div class="player" :style="{ bottom: playerY + 'px' }"></div>
     <div class="obstacle" :style="{ left: obstaclePosition.x + 'px' }"></div>
@@ -13,21 +14,22 @@
 </template>
 
 <script>
-// Import your audio files from src/assets
 import jumpSfx from '@/assets/jump.mp3';
 import pointsSfx from '@/assets/points.mp3';
 import backMusic from '@/assets/back.mp3';
 
+// CHANGE 2: Import Vuex helpers
+import { mapGetters, mapActions } from 'vuex';
+
 export default {
   data() {
     return {
-      score: 0,
+      // score: 0,  <-- YOU CAN REMOVE OR COMMENT THIS OUT
       gameOver: false,
       obstaclePosition: { x: 500 },
       playerY: 0,
       isJumping: false,
       animationFrame: null,
-      // Audio Objects
       sounds: {
         jump: new Audio(jumpSfx),
         points: new Audio(pointsSfx),
@@ -35,48 +37,44 @@ export default {
       }
     };
   },
+
+  // CHANGE 3: Add computed section to map the score from Vuex
+  computed: {
+    ...mapGetters(['currentScore'])
+  },
+
   mounted() {
-    // Setup background music settings
     this.sounds.bgm.loop = true;
     this.sounds.bgm.volume = 1;
-
     this.gameLoop();
-
-    // Spacebar listener
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') this.jump();
     });
   },
   methods: {
+    // CHANGE 4: Map the addScore action
+    ...mapActions(['addScore']),
+
     gameLoop() {
       if (this.gameOver) return;
-
       this.obstaclePosition.x -= 5;
-
       if (this.obstaclePosition.x < -40) {
         this.obstaclePosition.x = 500;
         this.incrementScore();
       }
-
       this.checkCollision();
       this.animationFrame = requestAnimationFrame(this.gameLoop);
     },
 
     jump() {
       if (this.isJumping || this.gameOver) return;
-
-      // Play Jump Sound
       this.sounds.jump.currentTime = 0;
       this.sounds.jump.play();
-
-      // Start BGM on first interaction (required by most browsers)
       if (this.sounds.bgm.paused) {
         this.sounds.bgm.play();
       }
-
       this.isJumping = true;
       let height = 0;
-      
       const jumpInterval = setInterval(() => {
         if (height >= 150) {
           clearInterval(jumpInterval);
@@ -95,60 +93,41 @@ export default {
     },
 
     checkCollision() {
-      const playerRect = { 
-        left: 50, 
-        right: 90, 
-        top: this.playerY + 40, 
-        bottom: this.playerY 
-      };
-      const obsRect = { 
-        left: this.obstaclePosition.x, 
-        right: this.obstaclePosition.x + 40, 
-        top: 40, 
-        bottom: 0 
-      };
-
-      if (
-        playerRect.right > obsRect.left &&
-        playerRect.left < obsRect.right &&
-        playerRect.bottom < obsRect.top
-      ) {
+      const playerRect = { left: 50, right: 90, top: this.playerY + 40, bottom: this.playerY };
+      const obsRect = { left: this.obstaclePosition.x, right: this.obstaclePosition.x + 40, top: 40, bottom: 0 };
+      if (playerRect.right > obsRect.left && playerRect.left < obsRect.right && playerRect.bottom < obsRect.top) {
         this.gameOver = true;
-        
-        // Stop music on game over
         this.sounds.bgm.pause();
-        
         cancelAnimationFrame(this.animationFrame);
       }
     },
 
     incrementScore() {
-      this.score++;
-      // Play Points Sound
+      // CHANGE 5: Call the Vuex action instead of this.score++
+      this.addScore(); 
+      
       this.sounds.points.currentTime = 0;
       this.sounds.points.play();
     },
 
     resetGame() {
-      this.score = 0;
+      // NOTE: For a real app, you'd create a reset mutation in Vuex, 
+      // but for this activity, we just focus on incrementing.
       this.gameOver = false;
       this.obstaclePosition.x = 500;
       this.playerY = 0;
-
-      // Restart Music
       this.sounds.bgm.currentTime = 0;
       this.sounds.bgm.play();
-
       this.gameLoop();
     }
   },
-  // Clean up sounds and listeners if component is destroyed
   beforeUnmount() {
     this.sounds.bgm.pause();
     window.removeEventListener('keydown', this.jump);
   }
 };
 </script>
+
 
 <style scoped>
 .game-container {
