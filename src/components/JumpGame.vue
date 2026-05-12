@@ -1,30 +1,45 @@
 <template>
-  <div class="game-container">
-    <!-- CHANGE 1: Use currentScore from Vuex -->
-    <div class="score-board">Score: {{ currentScore }}</div>
+  <!-- WRAP EVERYTHING IN ONE DIV -->
+  <div class="main-wrapper">
     
-    <div class="player" :style="{ bottom: playerY + 'px' }"></div>
-    <div class="obstacle" :style="{ left: obstaclePosition.x + 'px' }"></div>
+    <div class="game-container">
+      <div class="score-board">Score: {{ currentScore }}</div>
+      <div class="player" :style="{ bottom: playerY + 'px' }"></div>
+      <div class="obstacle" :style="{ left: obstaclePosition.x + 'px' }"></div>
 
-    <div v-if="gameOver" class="game-over-overlay">
-      <h1>GAME OVER</h1>
-      <button @click="resetGame">Restart</button>
+      <div v-if="gameOver" class="game-over-overlay">
+        <h1>GAME OVER</h1>
+        <button @click="resetGame">Restart</button>
+      </div>
     </div>
+
+    <!-- Move Leaderboard inside the wrapper -->
+    <div class="leaderboard-section">
+      <h3>Global Leaderboard</h3>
+      <ul>
+        <li v-for="item in highScores" :key="item.id">
+          {{ item.title }}: {{ item.id * 15 }} pts
+        </li>
+      </ul>
+    </div>
+
   </div>
 </template>
+
 
 <script>
 import jumpSfx from '@/assets/jump.mp3';
 import pointsSfx from '@/assets/points.mp3';
 import backMusic from '@/assets/back.mp3';
 
-// CHANGE 2: Import Vuex helpers
 import { mapGetters, mapActions } from 'vuex';
+// 1. IMPORT the service we created
+import { gameService } from '@/services/gameServices';
 
 export default {
   data() {
     return {
-      // score: 0,  <-- YOU CAN REMOVE OR COMMENT THIS OUT
+      highScores: [], // 2. DATA to store API results
       gameOver: false,
       obstaclePosition: { x: 500 },
       playerY: 0,
@@ -37,22 +52,22 @@ export default {
       }
     };
   },
-
-  // CHANGE 3: Add computed section to map the score from Vuex
   computed: {
     ...mapGetters(['currentScore'])
   },
-
-  mounted() {
+  async mounted() {
     this.sounds.bgm.loop = true;
     this.sounds.bgm.volume = 1;
     this.gameLoop();
+
+    // 3. FETCH high scores when game starts
+    this.highScores = await gameService.fetchHighScores();
+
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') this.jump();
     });
   },
   methods: {
-    // CHANGE 4: Map the addScore action
     ...mapActions(['addScore']),
 
     gameLoop() {
@@ -92,27 +107,32 @@ export default {
       }, 20);
     },
 
-    checkCollision() {
+    async checkCollision() { // 4. CHANGED to 'async' to handle API call
       const playerRect = { left: 50, right: 90, top: this.playerY + 40, bottom: this.playerY };
       const obsRect = { left: this.obstaclePosition.x, right: this.obstaclePosition.x + 40, top: 40, bottom: 0 };
+
       if (playerRect.right > obsRect.left && playerRect.left < obsRect.right && playerRect.bottom < obsRect.top) {
         this.gameOver = true;
         this.sounds.bgm.pause();
         cancelAnimationFrame(this.animationFrame);
+
+        // 5. SUBMIT score after Game Over
+        const playerName = prompt("Enter your name for the Leaderboard:");
+        if (playerName) {
+          await gameService.submitHighScore(playerName, this.currentScore);
+          // Refresh list to show new (mocked) data
+          this.highScores = await gameService.fetchHighScores();
+        }
       }
     },
 
     incrementScore() {
-      // CHANGE 5: Call the Vuex action instead of this.score++
-      this.addScore(); 
-      
+      this.addScore();
       this.sounds.points.currentTime = 0;
       this.sounds.points.play();
     },
 
     resetGame() {
-      // NOTE: For a real app, you'd create a reset mutation in Vuex, 
-      // but for this activity, we just focus on incrementing.
       this.gameOver = false;
       this.obstaclePosition.x = 500;
       this.playerY = 0;
